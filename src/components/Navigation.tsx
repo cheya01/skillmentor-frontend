@@ -23,7 +23,7 @@ export function Navigation() {
         className="hover:text-primary transition-colors"
         onClick={() => mobile && setIsOpen(false)}
       >
-        Tutors
+        Tutors1
       </Link>
       <Link
         to="/"
