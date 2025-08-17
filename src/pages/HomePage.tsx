@@ -1,11 +1,34 @@
 import { MentorCard } from "@/components/MentorCard";
-import { MOCK_MENTORS } from "@/lib/mockData";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { BACKEND_URL } from "@/config/env";
+import { MentorClass } from "@/lib/types";
 
 export default function HomePage() {
   const { isSignedIn } = useAuth();
+  const [mentorClasses, setMentorClasses] = useState<MentorClass[]>([]);
+
+  // Load all mentor classes
+  useEffect(() => {
+    async function fetchMentorClasses() {
+      try {
+        const response = await fetch(`${BACKEND_URL}/academic/classroom`);
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch mentor classes");
+        }
+
+        const data = await response.json();
+        setMentorClasses(data);
+      } catch (error) {
+        console.error("Error fetching mentor classes:", error);
+      }
+    }
+
+    fetchMentorClasses();
+  }, []);
 
   return (
     <div className="py-10">
@@ -42,8 +65,11 @@ export default function HomePage() {
         </h1>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {MOCK_MENTORS.map((mentor) => (
-            <MentorCard key={mentor.id} mentor={mentor} />
+          {mentorClasses.map((mentorClass) => (
+            <MentorCard
+              key={mentorClass.class_room_id}
+              mentorClass={mentorClass}
+            />
           ))}
         </div>
       </div>

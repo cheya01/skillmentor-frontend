@@ -9,12 +9,12 @@ import {
   DialogDescription,
 } from "./ui/dialog";
 import { useNavigate } from "react-router";
-import type { Mentor } from "@/lib/types";
+import type { MentorClass } from "@/lib/types";
 
 interface SchedulingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  mentor: Mentor;
+  mentorClass: MentorClass;
 }
 
 const TIME_SLOTS = [
@@ -31,7 +31,7 @@ const TIME_SLOTS = [
 export function SchedulingModal({
   isOpen,
   onClose,
-  mentor,
+  mentorClass,
 }: SchedulingModalProps) {
   const [date, setDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState<string>();
@@ -46,13 +46,12 @@ export function SchedulingModal({
         Number.parseInt(minutes)
       );
 
-      const sessionId = `${mentor.id}-${Date.now()}`;
+      const sessionId = `${mentorClass.class_room_id}-${Date.now()}`;
       const searchParams = new URLSearchParams({
         date: sessionDateTime.toISOString(),
-        courseTitle: mentor.courseTitle,
-        mentorName: mentor.mentorName,
-        mentorId: mentor.id,
-        mentorImg: mentor.mentorImageUrl,
+        mentorId: mentorClass.mentor.mentor_id.toString(),
+        classroomID: mentorClass.class_room_id.toString(),
+        topic: mentorClass.title,
       });
       navigate(`/payment/${sessionId}?${searchParams.toString()}`);
     }
@@ -65,7 +64,7 @@ export function SchedulingModal({
           <DialogTitle>Schedule this session</DialogTitle>
           <DialogDescription className="sr-only">
             Pick a date and time for your mentoring session with{" "}
-            {mentor.mentorName}.
+            {mentorClass.mentor.first_name}.
           </DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
