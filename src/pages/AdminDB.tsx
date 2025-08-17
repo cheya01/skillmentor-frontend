@@ -28,6 +28,10 @@ export default function AdminDB() {
   const navigate = useNavigate();
   const { getToken } = useAuth();
 
+  function delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   useEffect(() => {
     if (isLoaded && user?.publicMetadata.role !== "admin") {
       navigate("/dashboard", { replace: true });
@@ -96,6 +100,7 @@ export default function AdminDB() {
     setLoadingSessions(true);
     try {
       const token = await getToken({ template: "skillmentor-auth-frontend" });
+      await delay(2000); // wait for 2 seconds
       const res = await fetch(`${BACKEND_URL}/academic/session`, {
         headers: { Authorization: `Bearer ${token}` },
       });

@@ -32,9 +32,14 @@ export default function PaymentPage() {
   const [student, setStudent] = useState<Student | null>(null);
   const [mentorClass, setMentorClass] = useState<MentorClass | null>(null);
 
+  // add delay between fetching student and class data
+  function delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   useEffect(() => {
     async function fetchData() {
-      const token = await getToken();
+      const token = await getToken({ template: "skillmentor-auth-frontend" });
       const result = await fetch(
         `${BACKEND_URL}/academic/student/${user?.id}`,
         {
@@ -43,6 +48,7 @@ export default function PaymentPage() {
           },
         }
       );
+      console.log("result", result);
       if (!result.ok) {
         toast({
           title: "Error",
@@ -56,6 +62,7 @@ export default function PaymentPage() {
       const studentData: Student = await result.json();
       setStudent(studentData);
 
+      await delay(3000); // wait for 3 seconds
       const result2 = await fetch(
         `${BACKEND_URL}/academic/classroom/${classroomID}`,
         {
@@ -64,6 +71,7 @@ export default function PaymentPage() {
           },
         }
       );
+      console.log("result2", result2);
       if (!result2.ok) {
         toast({
           title: "Error",
@@ -121,7 +129,8 @@ export default function PaymentPage() {
         topic: topic,
       };
 
-      const token = await getToken();
+      const token = await getToken({ template: "skillmentor-auth-frontend" });
+
 
       const result = await fetch(`${BACKEND_URL}/academic/session`, {
         method: "POST",

@@ -13,14 +13,9 @@ function App() {
   return (
     <BrowserRouter>
       <Layout>
-        {/* Optional: mount RoleBootstrapper here if you use it */}
-        {/* <SignedIn><RoleBootstrapper /></SignedIn> */}
-
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/post-auth" element={<PostAuth />} />
-
           <Route
             path="/dashboard"
             element={
@@ -30,17 +25,6 @@ function App() {
               </>
             }
           />
-
-          <Route
-            path="/admin"
-            element={
-              <>
-                <SignedIn><AdminDB /></SignedIn>
-                <SignedOut><LoginPage /></SignedOut>
-              </>
-            }
-          />
-
           <Route
             path="/payment/:sessionId"
             element={
@@ -51,6 +35,16 @@ function App() {
             }
           />
           <Route path="*" element={<LoginPage />} />
+          <Route path="/post-auth" element={<PostAuth />} />
+          <Route
+            path="/admin"
+            element={
+              <>
+                <SignedIn><AdminDB /></SignedIn>
+                <SignedOut><LoginPage /></SignedOut>
+              </>
+            }
+          />
         </Routes>
       </Layout>
     </BrowserRouter>

@@ -13,6 +13,10 @@ export default function DashboardPage() {
   const { getToken } = useAuth();
   const { user } = useUser();
 
+  function delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   useEffect(() => {
     async function createOrFetchUser() {
       if (!user) return;
@@ -65,10 +69,11 @@ export default function DashboardPage() {
     async function fetchSessions() {
       if (!user) return;
 
-      const token = await getToken();
+      const token = await getToken({ template: "skillmentor-auth-frontend" });
       if (!token) return;
 
       try {
+      await delay(3000); // wait for 2 seconds
         const response = await fetch(
           `${BACKEND_URL}/academic/session/student/${user.id}`,
           {
