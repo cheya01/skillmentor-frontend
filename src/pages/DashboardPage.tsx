@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { CalendarDays } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
+import Loader from "@/components/Loader";
 import { FullSession } from "@/lib/types";
 import { useNavigate } from "react-router";
 import { BACKEND_URL } from "@/config/env";
+import { Link } from "react-router";
 
 export default function DashboardPage() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -99,27 +101,27 @@ export default function DashboardPage() {
     }
   }, [isLoaded, isSignedIn]);
 
-  if (!isLoaded) {
-    return (
-      <div className="container py-10">
-        <div className="flex items-center justify-center">
-          <div className="text-lg">Loading...</div>
-        </div>
+ if (!isLoaded || !courses.length) {
+  return (
+    <div className="container py-10">
+      <div className="flex items-center justify-center">
+        <Loader />   {/* custom animation */}
       </div>
-    );
-  }
+    </div>
+  );
+}
   if (!isSignedIn) {
     router("/login");
   }
 
-  if (!courses.length) {
-    return (
-      <div className="container py-10">
-        <h1 className="text-3xl font-bold tracking-tight mb-6">My Courses</h1>
-        <p className="text-muted-foreground">No courses enrolled yet.</p>
-      </div>
-    );
-  }
+  // if (!courses.length) {
+  //   return (
+  //     <div className="container py-10">
+  //       <h1 className="text-3xl font-bold tracking-tight mb-6">My Courses</h1>
+  //       <p className="text-muted-foreground">No courses enrolled yet.</p>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="container py-10">
@@ -155,10 +157,15 @@ export default function DashboardPage() {
               <h2 className="text-xl font-semibold text-white">
                 {course.topic}
               </h2>
-              <p className="text-blue-100/80">
-                Mentor:{" "}
-                {course.mentor.first_name + " " + course.mentor.last_name}
-              </p>
+              <Link to={`/mentor/${course.mentor.mentor_id}`}>
+                <p className="text-blue-100/80">
+                  <span>Mentor: </span>
+                  <span className="hover:underline">
+                    {course.mentor.first_name + " " + course.mentor.last_name}
+                  </span>
+                </p>
+              </Link>
+
               <div className="flex items-center text-blue-100/80 text-sm mt-2">
                 <CalendarDays className="mr-2 h-4 w-4" />
                 Next Session: {new Date(course.start_time).toLocaleDateString()}

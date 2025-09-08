@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router";
-import { useAuth, SignInButton, UserButton } from "@clerk/clerk-react";
+import { useAuth, SignInButton, UserButton, useUser } from "@clerk/clerk-react";
 import SkillMentorLogo from "@/assets/logo.webp";
 import { Menu } from "lucide-react";
 import { useState } from "react";
@@ -9,7 +9,10 @@ import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
 
 export function Navigation() {
   const { isSignedIn } = useAuth();
+  const { user, isLoaded } = useUser();   // 👈 get current user
   const [isOpen, setIsOpen] = useState(false);
+
+  const isAdmin = isLoaded && user?.publicMetadata.role === "admin";
 
   const NavItems = ({ mobile = false }: { mobile?: boolean }) => (
     <nav
@@ -41,6 +44,7 @@ export function Navigation() {
       </Link>
     </nav>
   );
+
   const AuthButtons = ({ mobile = false }: { mobile?: boolean }) => (
     <div
       className={cn(
@@ -50,6 +54,22 @@ export function Navigation() {
     >
       {isSignedIn ? (
         <>
+          {/* Admin Dashboard button (only for admins) */}
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className={cn(mobile && "w-full")}
+              onClick={() => mobile && setIsOpen(false)}
+            >
+              <Button
+                variant="ghost" // keep it subtle
+                className={cn("text-white hover:bg-red-600", mobile && "w-full")}
+              >
+                Admin Dashboard
+              </Button>
+            </Link>
+          )}
+
           <Link
             to="/dashboard"
             className={cn(mobile && "w-full")}

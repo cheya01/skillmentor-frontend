@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Building2, Calendar, GraduationCap } from "lucide-react";
@@ -39,16 +40,19 @@ export function MentorCard({ mentorClass }: { mentorClass: MentorClass }) {
                 </p>
               </div> */}
               <div className="flex items-center space-x-2">
-                <img
-                  src={mentorClass.mentor.mentor_image}
-                  alt={mentorClass.mentor.first_name}
-                  className="size-6 object-cover object-top rounded-full"
-                />
-                <span className="text-sm">
-                  {mentorClass.mentor.first_name +
-                    " " +
-                    mentorClass.mentor.last_name}
-                </span>
+                <Link
+                  to={`/mentor/${mentorClass.mentor.mentor_id}`}
+                  className="flex items-center space-x-2 hover:underline"
+                >
+                  <img
+                    src={mentorClass.mentor.mentor_image}
+                    alt={mentorClass.mentor.first_name}
+                    className="size-6 object-cover object-top rounded-full"
+                  />
+                  <span className="text-sm">
+                    {mentorClass.mentor.first_name + " " + mentorClass.mentor.last_name}
+                  </span>
+                </Link>
               </div>
               <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                 <Building2 className="size-6" />

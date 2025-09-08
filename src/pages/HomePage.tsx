@@ -1,4 +1,5 @@
 import { MentorCard } from "@/components/MentorCard";
+import Loader from "@/components/Loader";
 import { Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/clerk-react";
@@ -9,26 +10,24 @@ import { MentorClass } from "@/lib/types";
 export default function HomePage() {
   const { isSignedIn } = useAuth();
   const [mentorClasses, setMentorClasses] = useState<MentorClass[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Load all mentor classes
   useEffect(() => {
-    async function fetchMentorClasses() {
-      try {
-        const response = await fetch(`${BACKEND_URL}/academic/classroom`);
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch mentor classes");
-        }
-
-        const data = await response.json();
-        setMentorClasses(data);
-      } catch (error) {
-        console.error("Error fetching mentor classes:", error);
-      }
+  async function fetchMentorClasses() {
+    try {
+      const response = await fetch(`${BACKEND_URL}/academic/classroom`);
+      if (!response.ok) throw new Error("Failed to fetch mentor classes");
+      const data = await response.json();
+      setMentorClasses(data);
+    } catch (error) {
+      console.error("Error fetching mentor classes:", error);
+    } finally {
+      setLoading(false);
     }
-
-    fetchMentorClasses();
-  }, []);
+  }
+  fetchMentorClasses();
+}, []);
 
   return (
     <div className="py-10">
@@ -65,12 +64,17 @@ export default function HomePage() {
         </h1>
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {mentorClasses.map((mentorClass) => (
-            <MentorCard
-              key={mentorClass.class_room_id}
-              mentorClass={mentorClass}
-            />
-          ))}
+          {loading ? (
+            <div className="col-span-full flex justify-center py-12">
+              <Loader />
+            </div>
+          ) : mentorClasses.length ? (
+            mentorClasses.map((mentorClass) => (
+              <MentorCard key={mentorClass.class_room_id} mentorClass={mentorClass} />
+            ))
+          ) : (
+            <div className="col-span-full text-sm text-gray-500">No classes available.</div>
+          )}
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router";
+import Loader from "@/components/Loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -164,6 +165,14 @@ export default function PaymentPage() {
       setIsUploading(false);
     }
   };
+
+  if (!student || !mentorClass) {
+  return (
+    <div className="container py-16 flex items-center justify-center">
+      <Loader />
+    </div>
+  );
+}
 
   return (
     <div className="container max-w-md py-10">

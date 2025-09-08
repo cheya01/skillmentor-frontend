@@ -3,8 +3,9 @@ import { useAuth, useUser } from "@clerk/clerk-react";
 import { BACKEND_URL } from "@/config/env";
 import { useNavigate } from "react-router";
 
-
+// -----------------------------
 // Minimal types
+// -----------------------------
 type Classroom = {
   class_room_id: number;
   title: string;
@@ -14,22 +15,37 @@ type Classroom = {
 
 type Session = {
   session_id: number;
+  class_room_id: number;
   topic?: string;
   start_time: string;
   end_time?: string;
   session_status: "PENDING" | "ACCEPTED" | "COMPLETED" | string;
   student?: { first_name: string; last_name: string } | null;
   mentor?: { first_name: string; last_name: string } | null;
-  classroom?: { title: string } | null;
+  class_room?: Classroom | null;
 };
+
+// -----------------------------
+// Lightweight toast system
+// -----------------------------
+type Toast = { id: number; type: "success" | "error"; msg: string };
 
 export default function AdminDB() {
   const { user, isLoaded } = useUser();
   const navigate = useNavigate();
   const { getToken } = useAuth();
 
+  // toast helpers (green for success, red for error)
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  function pushToast(type: Toast["type"], msg: string) {
+    const id = Date.now() + Math.random();
+    setToasts((t) => [...t, { id, type, msg }]);
+    // auto-dismiss after 3s
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
+  }
+
   function delay(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   useEffect(() => {
@@ -40,16 +56,19 @@ export default function AdminDB() {
 
   if (!isLoaded || user?.publicMetadata.role !== "admin") return null;
 
-  // Create Class
+  // -----------------------------
+  // Create Class (kept compact)
+  // -----------------------------
   const [newClass, setNewClass] = useState({
     title: "",
     enrolled_student_count: 0,
     class_image: "",
   });
 
+  // -----------------------------
   // Create Mentor
+  // -----------------------------
   const [mentor, setMentor] = useState({
-    clerk_mentor_id: "",
     first_name: "",
     last_name: "",
     address: "",
@@ -64,7 +83,9 @@ export default function AdminDB() {
   });
   const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
 
+  // -----------------------------
   // Manage Bookings
+  // -----------------------------
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
@@ -78,21 +99,24 @@ export default function AdminDB() {
     [mentor, selectedClassIds]
   );
 
+  // -----------------------------
   // Data sources
+  // -----------------------------
   const [classes, setClasses] = useState<Classroom[]>([]);
 
-  // Fetch all classes for dropdown
+  // Fetch all unassigned classes for dropdown
   async function loadClasses() {
     try {
       const token = await getToken({ template: "skillmentor-auth-frontend" });
-      const res = await fetch(`${BACKEND_URL}/academic/classroom`, {
+      const res = await fetch(`${BACKEND_URL}/academic/classroom/unassigned`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setClasses(data);
-      }
-    } catch {}
+      if (!res.ok) throw new Error("Failed to load unassigned classes");
+      const data = await res.json();
+      setClasses(data);
+    } catch (e) {
+      pushToast("error", "Failed to load unassigned classes");
+    }
   }
 
   // Fetch sessions
@@ -100,15 +124,17 @@ export default function AdminDB() {
     setLoadingSessions(true);
     try {
       const token = await getToken({ template: "skillmentor-auth-frontend" });
-      await delay(2000); // wait for 2 seconds
+      await delay(2000); // wait for 2 seconds (kept)
       const res = await fetch(`${BACKEND_URL}/academic/session`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data);
-      }
-    } catch {}
+      if (!res.ok) throw new Error("Failed to load sessions");
+      const data = await res.json();
+      setSessions(data);
+      console.log(sessions);
+    } catch (e) {
+      pushToast("error", "Failed to load sessions");
+    }
     setLoadingSessions(false);
   }
 
@@ -118,24 +144,26 @@ export default function AdminDB() {
     loadSessions();
   }, [isLoaded]);
 
+  // -----------------------------
   // Handlers
+  // -----------------------------
   async function handleCreateClass(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmitClass) return;
     try {
       const token = await getToken({ template: "skillmentor-auth-frontend" });
-      console.log(newClass)
       const res = await fetch(`${BACKEND_URL}/academic/classroom`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(newClass),
       });
-      console.log(res);
-      if (res.ok) {
-        setNewClass({ title: "", enrolled_student_count: 0, class_image: "" });
-        loadClasses();
-      }
-    } catch {}
+      if (!res.ok) throw new Error("Create failed");
+      setNewClass({ title: "", enrolled_student_count: 0, class_image: "" });
+      pushToast("success", "Class created");
+      loadClasses();
+    } catch (e) {
+      pushToast("error", "Failed to create class");
+    }
   }
 
   async function handleCreateMentor(e: React.FormEvent) {
@@ -143,24 +171,20 @@ export default function AdminDB() {
     if (!canSubmitMentor) return;
     try {
       const token = await getToken({ template: "skillmentor-auth-frontend" });
-      // If multiple classes are selected, create one mentor per class_room_id (simple approach)
+      let okCount = 0;
+      let failCount = 0;
       for (const id of selectedClassIds) {
-        const payload = { ...mentor, class_room_id: id } as any;
-        // Ensure numeric fee
-        payload.session_fee = Number(payload.session_fee) || 0;
+        const payload: any = { ...mentor, class_room_id: id };
+        payload.session_fee = Number(payload.session_fee) || 0; // ensure numeric
         const res = await fetch(`${BACKEND_URL}/academic/mentor`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) {
-          // stop on first error
-          break;
-        }
+        if (res.ok) okCount++; else failCount++;
       }
       // reset
       setMentor({
-        clerk_mentor_id: "",
         first_name: "",
         last_name: "",
         address: "",
@@ -174,7 +198,12 @@ export default function AdminDB() {
         mentor_image: "",
       });
       setSelectedClassIds([]);
-    } catch {}
+      if (okCount && !failCount) pushToast("success", `Mentor created for ${okCount} class(es)`);
+      else if (okCount && failCount) pushToast("error", `Partial success: ${okCount} created, ${failCount} failed`);
+      else pushToast("error", "Failed to create mentor");
+    } catch (e) {
+      pushToast("error", "Failed to create mentor");
+    }
   }
 
   async function updateSessionStatus(sessionId: number, status: "ACCEPTED" | "COMPLETED") {
@@ -184,112 +213,215 @@ export default function AdminDB() {
         `${BACKEND_URL}/academic/session/${sessionId}?sessionStatus=${status}`,
         { method: "PUT", headers: { Authorization: `Bearer ${token}` } }
       );
-      if (res.ok) loadSessions();
-    } catch {}
+      if (!res.ok) throw new Error("Update failed");
+      pushToast("success", `Session ${status.toLowerCase()} successfully`);
+      loadSessions();
+    } catch (e) {
+      pushToast("error", "Failed to update session");
+    }
   }
 
+  // -----------------------------
   // UI
+  // -----------------------------
   return (
     <div className="container mx-auto p-4 lg:p-8">
+      {/* Toast container */}
+      <div className="fixed right-4 top-4 z-50 space-y-2">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={
+              "rounded-lg px-3 py-2 text-sm shadow " +
+              (t.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white")
+            }
+            role="status"
+            aria-live="polite"
+          >
+            {t.msg}
+          </div>
+        ))}
+      </div>
+
       <h1 className="text-2xl lg:text-3xl font-semibold mb-6">Admin Dashboard</h1>
 
       {/* 3 columns on lg+, stacked on small */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Create Class */}
-        <section className="rounded-2xl border p-5 shadow-sm bg-white">
-          <h2 className="text-xl font-medium mb-4">Create Class</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
+        {/* Create Class - compact so sessions area is more visible */}
+        <section className="rounded-2xl border p-4 shadow-sm bg-white
+                    lg:col-span-2 max-w-[280px]">
+          <h2 className="text-lg font-medium mb-3">Create Class</h2>
           <form onSubmit={handleCreateClass} className="space-y-3">
-            <div>
-              <label className="block text-sm mb-1">Title</label>
+            <label className="text-sm">
+              <span className="mb-1 block">Class Title</span>
               <input
                 className="w-full rounded-lg border px-3 py-2"
+                placeholder="Class title"
                 value={newClass.title}
                 onChange={(e) => setNewClass((s) => ({ ...s, title: e.target.value }))}
-                placeholder="AWS DevOps Engineering Professional Exam Prep"
                 required
               />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Initial Enrolled Count</label>
+            </label>
+
+            <label className="text-sm">
+              <span className="mb-1 block">Initial Enrolled Count</span>
               <input
                 type="number"
                 className="w-full rounded-lg border px-3 py-2"
                 value={newClass.enrolled_student_count}
-                onChange={(e) => setNewClass((s) => ({ ...s, enrolled_student_count: Number(e.target.value || 0) }))}
+                onChange={(e) =>
+                  setNewClass((s) => ({ ...s, enrolled_student_count: Number(e.target.value || 0) }))
+                }
                 min={0}
               />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Class Image URL</label>
+            </label>
+
+            <label className="text-sm">
+              <span className="mb-1 block">Class Image URL</span>
               <input
                 className="w-full rounded-lg border px-3 py-2"
                 value={newClass.class_image}
                 onChange={(e) => setNewClass((s) => ({ ...s, class_image: e.target.value }))}
-                placeholder="https://.../image.webp"
+                placeholder="https://.../class.webp"
               />
+            </label>
+
+            <div className="flex justify-center pt-2">
+              <button
+                className="rounded-lg bg-black text-white px-6 py-2 disabled:opacity-50"
+                type="submit"
+                disabled={!canSubmitClass}
+              >
+                Create
+              </button>
             </div>
-            <button
-              className="w-full rounded-lg bg-black text-white py-2 disabled:opacity-50"
-              type="submit"
-              disabled={!canSubmitClass}
-            >
-              Create Class
-            </button>
           </form>
         </section>
 
+
         {/* Create Mentor */}
-        <section className="rounded-2xl border p-5 shadow-sm bg-white">
+        <section className="rounded-2xl border p-5 shadow-sm bg-white
+                    lg:col-span-3">
           <h2 className="text-xl font-medium mb-4">Create Mentor</h2>
-          <form onSubmit={handleCreateMentor} className="space-y-3">
+          {/* Two-column aligned grid. Keep labels consistent. */}
+          <form onSubmit={handleCreateMentor} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm mb-1">Clerk Mentor ID</label>
-                <input className="w-full rounded-lg border px-3 py-2" value={mentor.clerk_mentor_id} onChange={(e) => setMentor((s) => ({ ...s, clerk_mentor_id: e.target.value }))} />
-              </div>
+              {/* Title dropdown */}
               <div>
                 <label className="block text-sm mb-1">Title</label>
-                <input className="w-full rounded-lg border px-3 py-2" value={mentor.title} onChange={(e) => setMentor((s) => ({ ...s, title: e.target.value }))} />
+                <select
+                  className="w-full rounded-lg border px-3 py-2"
+                  value={mentor.title}
+                  onChange={(e) => setMentor((s) => ({ ...s, title: e.target.value }))}
+                >
+                  <option value="">Select</option>
+                  <option value="Mr.">Mr.</option>
+                  <option value="Mrs.">Mrs.</option>
+                  <option value="Miss.">Miss.</option>
+                  <option value="Ven.">Ven.</option>
+                </select>
               </div>
+
               <div>
                 <label className="block text-sm mb-1">First Name</label>
-                <input className="w-full rounded-lg border px-3 py-2" value={mentor.first_name} onChange={(e) => setMentor((s) => ({ ...s, first_name: e.target.value }))} required />
+                <input
+                  className="w-full rounded-lg border px-3 py-2"
+                  value={mentor.first_name}
+                  onChange={(e) => setMentor((s) => ({ ...s, first_name: e.target.value }))}
+                  required
+                />
               </div>
+
               <div>
                 <label className="block text-sm mb-1">Last Name</label>
-                <input className="w-full rounded-lg border px-3 py-2" value={mentor.last_name} onChange={(e) => setMentor((s) => ({ ...s, last_name: e.target.value }))} required />
+                <input
+                  className="w-full rounded-lg border px-3 py-2"
+                  value={mentor.last_name}
+                  onChange={(e) => setMentor((s) => ({ ...s, last_name: e.target.value }))}
+                  required
+                />
               </div>
-              <div className="sm:col-span-2">
-                <label className="block text-sm mb-1">Address</label>
-                <input className="w-full rounded-lg border px-3 py-2" value={mentor.address} onChange={(e) => setMentor((s) => ({ ...s, address: e.target.value }))} />
-              </div>
+
               <div>
                 <label className="block text-sm mb-1">Email</label>
-                <input type="email" className="w-full rounded-lg border px-3 py-2" value={mentor.email} onChange={(e) => setMentor((s) => ({ ...s, email: e.target.value }))} required />
+                <input
+                  type="email"
+                  className="w-full rounded-lg border px-3 py-2"
+                  value={mentor.email}
+                  onChange={(e) => setMentor((s) => ({ ...s, email: e.target.value }))}
+                  required
+                />
               </div>
+
               <div>
                 <label className="block text-sm mb-1">Phone</label>
-                <input className="w-full rounded-lg border px-3 py-2" value={mentor.phone_number} onChange={(e) => setMentor((s) => ({ ...s, phone_number: e.target.value }))} />
+                <input
+                  className="w-full rounded-lg border px-3 py-2"
+                  value={mentor.phone_number}
+                  onChange={(e) => setMentor((s) => ({ ...s, phone_number: e.target.value }))}
+                />
               </div>
+
               <div>
                 <label className="block text-sm mb-1">Session Fee</label>
-                <input type="number" className="w-full rounded-lg border px-3 py-2" value={mentor.session_fee} onChange={(e) => setMentor((s) => ({ ...s, session_fee: Number(e.target.value || 0) }))} min={0} />
+                <input
+                  type="number"
+                  className="w-full rounded-lg border px-3 py-2"
+                  value={mentor.session_fee}
+                  onChange={(e) => setMentor((s) => ({ ...s, session_fee: Number(e.target.value || 0) }))}
+                  min={0}
+                />
               </div>
+
               <div>
                 <label className="block text-sm mb-1">Profession</label>
-                <input className="w-full rounded-lg border px-3 py-2" value={mentor.profession} onChange={(e) => setMentor((s) => ({ ...s, profession: e.target.value }))} />
+                <input
+                  className="w-full rounded-lg border px-3 py-2"
+                  value={mentor.profession}
+                  onChange={(e) => setMentor((s) => ({ ...s, profession: e.target.value }))}
+                />
               </div>
-              <div className="sm:col-span-2">
-                <label className="block text-sm mb-1">Subject / Bio</label>
-                <textarea className="w-full rounded-lg border px-3 py-2" rows={3} value={mentor.subject} onChange={(e) => setMentor((s) => ({ ...s, subject: e.target.value }))} />
-              </div>
+
               <div>
                 <label className="block text-sm mb-1">Qualification</label>
-                <input className="w-full rounded-lg border px-3 py-2" value={mentor.qualification} onChange={(e) => setMentor((s) => ({ ...s, qualification: e.target.value }))} />
+                <input
+                  className="w-full rounded-lg border px-3 py-2"
+                  value={mentor.qualification}
+                  onChange={(e) => setMentor((s) => ({ ...s, qualification: e.target.value }))}
+                />
               </div>
-              <div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm mb-1">Address</label>
+                <input
+                  className="w-full rounded-lg border px-3 py-2"
+                  value={mentor.address}
+                  onChange={(e) => setMentor((s) => ({ ...s, address: e.target.value }))}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-sm mb-1">Subject / Bio</label>
+                <textarea
+                  className="w-full rounded-lg border px-3 py-2"
+                  rows={3}
+                  maxLength={255} // 👈 enforce max length
+                  value={mentor.subject}
+                  onChange={(e) => setMentor((s) => ({ ...s, subject: e.target.value }))}
+                />
+                <div className="text-xs text-gray-500 mt-1 text-right">
+                  {mentor.subject.length}/255
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
                 <label className="block text-sm mb-1">Image URL</label>
-                <input className="w-full rounded-lg border px-3 py-2" value={mentor.mentor_image} onChange={(e) => setMentor((s) => ({ ...s, mentor_image: e.target.value }))} placeholder="https://.../mentor.webp" />
+                <input
+                  className="w-full rounded-lg border px-3 py-2"
+                  value={mentor.mentor_image}
+                  onChange={(e) => setMentor((s) => ({ ...s, mentor_image: e.target.value }))}
+                  placeholder="https://.../mentor.webp"
+                />
               </div>
             </div>
 
@@ -311,20 +443,25 @@ export default function AdminDB() {
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">Holds Ctrl/Cmd to select multiple.</p>
             </div>
 
-            <button className="w-full rounded-lg bg-black text-white py-2 disabled:opacity-50" type="submit" disabled={!canSubmitMentor}>
+            <button
+              className="w-full rounded-lg bg-black text-white py-2 disabled:opacity-50"
+              type="submit"
+              disabled={!canSubmitMentor}
+            >
               Create Mentor
             </button>
           </form>
         </section>
 
         {/* Manage Bookings */}
-        <section className="rounded-2xl border p-5 shadow-sm bg-white">
+        <section className="rounded-2xl border p-5 shadow-sm bg-white lg:col-span-7">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-medium">Manage Bookings</h2>
-            <button onClick={loadSessions} className="rounded-lg border px-3 py-1 text-sm">Refresh</button>
+            <button onClick={loadSessions} className="rounded-lg border px-3 py-1 text-sm">
+              Refresh
+            </button>
           </div>
 
           <div className="overflow-auto rounded-xl border">
@@ -342,47 +479,84 @@ export default function AdminDB() {
               </thead>
               <tbody>
                 {loadingSessions ? (
-                  <tr><td className="p-3" colSpan={7}>Loading...</td></tr>
+                  <tr>
+                    <td className="p-3" colSpan={7}>Loading...</td>
+                  </tr>
                 ) : sessions.length === 0 ? (
-                  <tr><td className="p-3" colSpan={7}>No sessions</td></tr>
+                  <tr>
+                    <td className="p-3" colSpan={7}>No sessions</td>
+                  </tr>
                 ) : (
-                  sessions.map((s) => (
-                    <tr key={s.session_id} className="border-t">
-                      <Td>{s.classroom?.title || '-'}</Td>
-                      <Td>{s.student ? `${s.student.first_name} ${s.student.last_name}` : '-'}</Td>
-                      <Td>{s.mentor ? `${s.mentor.first_name} ${s.mentor.last_name}` : '-'}</Td>
-                      <Td>{new Date(s.start_time).toLocaleString()}</Td>
-                      <Td>{durationText(s.start_time, s.end_time)}</Td>
-                      <Td>
-                        <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
-                          {s.session_status}
-                        </span>
-                      </Td>
-                      <Td>
-                        <div className="flex gap-2">
-                          <button
-                            className="rounded-lg border px-2 py-1 text-xs disabled:opacity-50"
-                            disabled={s.session_status !== "PENDING"}
-                            onClick={() => updateSessionStatus(s.session_id, "ACCEPTED")}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            className="rounded-lg border px-2 py-1 text-xs disabled:opacity-50"
-                            disabled={s.session_status !== "ACCEPTED"}
-                            onClick={() => updateSessionStatus(s.session_id, "COMPLETED")}
-                          >
-                            Complete
-                          </button>
-                        </div>
-                      </Td>
-                    </tr>
-                  ))
+                  sessions.map((s) => {
+                    const start = new Date(s.start_time);
+                    const dateStr = start.toLocaleDateString();
+                    const timeStr = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+                    return (
+                      <tr key={s.session_id} className="border-t">
+                        <Td>{s.class_room?.title || "-"}</Td>
+
+                        <Td>
+                          {s.student ? (
+                            <>
+                              {s.student.first_name}
+                              <br />
+                              {s.student.last_name}
+                            </>
+                          ) : "-"}
+                        </Td>
+
+                        <Td>
+                          {s.mentor ? (
+                            <>
+                              {s.mentor.first_name}
+                              <br />
+                              {s.mentor.last_name}
+                            </>
+                          ) : "-"}
+                        </Td>
+
+                        <Td>
+                          {dateStr}
+                          <br />
+                          {timeStr}
+                        </Td>
+
+                        <Td>{durationText(s.start_time, s.end_time)}</Td>
+
+                        <Td>
+                          <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
+                            {s.session_status}
+                          </span>
+                        </Td>
+
+                        <Td>
+                          <div className="flex gap-2">
+                            <button
+                              className="rounded-lg border px-2 py-1 text-xs disabled:opacity-50"
+                              disabled={s.session_status !== "PENDING"}
+                              onClick={() => updateSessionStatus(s.session_id, "ACCEPTED")}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              className="rounded-lg border px-2 py-1 text-xs disabled:opacity-50"
+                              disabled={s.session_status !== "ACCEPTED"}
+                              onClick={() => updateSessionStatus(s.session_id, "COMPLETED")}
+                            >
+                              Complete
+                            </button>
+                          </div>
+                        </Td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
         </section>
+
       </div>
     </div>
   );

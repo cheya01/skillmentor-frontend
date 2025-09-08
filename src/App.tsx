@@ -5,6 +5,7 @@ import HomePage from "@/pages/HomePage";
 import LoginPage from "@/pages/LoginPage";
 import DashboardPage from "@/pages/DashboardPage";
 import PaymentPage from "@/pages/PaymentPage";
+import MentorPage from "@/pages/MentorPage";
 import PostAuth from "@/pages/PostAuth";
 import AdminDB from "@/pages/AdminDB";
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
@@ -30,6 +31,15 @@ function App() {
             element={
               <>
                 <SignedIn><PaymentPage /></SignedIn>
+                <SignedOut><LoginPage /></SignedOut>
+              </>
+            }
+          />
+          <Route
+            path="/mentor/:mentorId"
+            element={
+              <>
+                <SignedIn><MentorPage /></SignedIn>
                 <SignedOut><LoginPage /></SignedOut>
               </>
             }
