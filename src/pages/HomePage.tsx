@@ -19,7 +19,13 @@ export default function HomePage() {
       const response = await fetch(`${BACKEND_URL}/academic/classroom`);
       if (!response.ok) throw new Error("Failed to fetch mentor classes");
       const data = await response.json();
-      setMentorClasses(data);
+
+      // ✅ sort by title ascending
+      const sorted = data.sort((a:any, b:any) =>
+        a.title.localeCompare(b.title)
+      );
+
+      setMentorClasses(sorted);
     } catch (error) {
       console.error("Error fetching mentor classes:", error);
     } finally {
@@ -69,9 +75,11 @@ export default function HomePage() {
               <Loader />
             </div>
           ) : mentorClasses.length ? (
-            mentorClasses.map((mentorClass) => (
-              <MentorCard key={mentorClass.class_room_id} mentorClass={mentorClass} />
-            ))
+            mentorClasses
+              .filter((mc) => mc.mentor && mc.mentor.mentor_id) // 👈 skip unassigned
+              .map((mentorClass) => (
+                <MentorCard key={mentorClass.class_room_id} mentorClass={mentorClass} />
+              ))
           ) : (
             <div className="col-span-full text-sm text-gray-500">No classes available.</div>
           )}

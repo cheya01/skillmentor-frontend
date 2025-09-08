@@ -15,6 +15,9 @@ export function MentorCard({ mentorClass }: { mentorClass: MentorClass }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { isSignedIn } = useAuth();
 
+  // guard against missing mentor
+  if (!mentorClass?.mentor) return null;
+
   // Use a simple threshold to decide if the bio is long enough
   const bioTooLong = mentorClass.mentor.subject.length > 200;
 
