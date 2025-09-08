@@ -6,8 +6,6 @@ import { useAuth } from "@clerk/clerk-react";
 import { BACKEND_URL } from "@/config/env";
 
 import {
-  Mail,
-  Phone,
   MapPin,
   Briefcase,
   GraduationCap,
