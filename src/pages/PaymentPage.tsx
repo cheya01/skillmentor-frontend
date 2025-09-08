@@ -11,7 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useToast } from "@/components/hooks/use-toast";
 import { MentorClass, Session, Student } from "@/lib/types";
 import { BACKEND_URL } from "@/config/env";
 import { useAuth, useUser } from "@clerk/clerk-react";
@@ -20,7 +19,6 @@ export default function PaymentPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { sessionId } = useParams();
-  const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -32,6 +30,15 @@ export default function PaymentPage() {
   const { getToken } = useAuth();
   const [student, setStudent] = useState<Student | null>(null);
   const [mentorClass, setMentorClass] = useState<MentorClass | null>(null);
+
+  type Toast = { id: number; type: "success" | "error"; msg: string };
+const [toasts, setToasts] = useState<Toast[]>([]);
+
+function pushToast(type: Toast["type"], msg: string) {
+  const id = Date.now() + Math.random();
+  setToasts((t) => [...t, { id, type, msg }]);
+  setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
+}
 
   // add delay between fetching student and class data
   function delay(ms: number) {
@@ -51,11 +58,7 @@ export default function PaymentPage() {
       );
       console.log("result", result);
       if (!result.ok) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch student data. Please try again later.",
-          variant: "destructive",
-        });
+        pushToast("error", "Failed to fetch student data. Please try again later.");
         navigate("/dashboard");
         return;
       }
@@ -74,12 +77,7 @@ export default function PaymentPage() {
       );
       console.log("result2", result2);
       if (!result2.ok) {
-        toast({
-          title: "Error",
-          description:
-            "Failed to fetch mentor class data. Please try again later.",
-          variant: "destructive",
-        });
+        pushToast("error", "Failed to fetch mentor class data. Please try again later.");
         navigate("/dashboard");
         return;
       }
@@ -146,22 +144,13 @@ export default function PaymentPage() {
         throw new Error("Failed to create session");
       }
 
-      toast({
-        title: "Payment Confirmed",
-        description:
-          "Your bank slip has been uploaded and verified. Session scheduled successfully.",
-      });
-
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 2000);
+      // show success toast, then wait, then navigate
+      pushToast("success", "Payment confirmed. Session scheduled successfully.");
+      await delay(3000); // let user see the toast
+      navigate("/dashboard");
+      
     } catch (error) {
-      toast({
-        title: "Error",
-        description:
-          "There was a problem scheduling your session. Please try again.",
-        variant: "destructive",
-      });
+      pushToast("error", "There was a problem scheduling your session. Please try again.");
       setIsUploading(false);
     }
   };
@@ -176,6 +165,22 @@ export default function PaymentPage() {
 
   return (
     <div className="container max-w-md py-10">
+      {/* Toasts */}
+      <div className="fixed right-4 top-20 z-50 space-y-2">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={
+              "rounded-lg px-3 py-2 text-sm shadow " +
+              (t.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white")
+            }
+            role="status"
+            aria-live="polite"
+          >
+            {t.msg}
+          </div>
+        ))}
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Upload Bank Transfer Slip</CardTitle>

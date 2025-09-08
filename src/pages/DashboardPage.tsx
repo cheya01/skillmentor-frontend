@@ -9,135 +9,83 @@ import { BACKEND_URL } from "@/config/env";
 import { Link } from "react-router";
 
 export default function DashboardPage() {
-  const { isLoaded, isSignedIn } = useAuth();
-  const [courses, setCourses] = useState<FullSession[]>([]);
-  const router = useNavigate();
-  const { getToken } = useAuth();
-  const { user } = useUser();
+const { isLoaded, isSignedIn } = useAuth();
+const { user } = useUser();
+const { getToken } = useAuth();
+const router = useNavigate();
 
-  function delay(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+const [courses, setCourses] = useState<FullSession[]>([]);
+const [loadingCourses, setLoadingCourses] = useState(true); // 👈
+
+function delay(ms: number) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+// fetch
+useEffect(() => {
+  async function fetchSessions() {
+    if (!user) return;
+    const token = await getToken({ template: "skillmentor-auth-frontend" });
+    if (!token) return;
+
+    try {
+      setLoadingCourses(true);                    // 👈 start
+      await delay(3000); // wait for 3 seconds
+      const response = await fetch(
+        `${BACKEND_URL}/academic/session/student/${user.id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!response.ok) throw new Error("Failed to fetch user sessions");
+      const data: FullSession[] = await response.json();
+      setCourses(data);
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+      setCourses([]); // ensure defined
+    } finally {
+      setLoadingCourses(false);                   // 👈 done
+    }
   }
 
-  useEffect(() => {
-    async function createOrFetchUser() {
-      if (!user) return;
+  if (isLoaded && isSignedIn) fetchSessions();
+}, [isLoaded, isSignedIn, user]);
 
-      const token = await getToken({ template: "skillmentor-auth-frontend" });
-      if (!token) return;
-
-      // Prepare a payload that matches with the  backend endpoint requirements
-      const userPayload = {
-        clerk_student_id: user.id,
-        first_name: user.firstName,
-        last_name: user.lastName,
-        email: user.primaryEmailAddress?.emailAddress,
-        phone_number: "-",
-        address: "-",
-        age: 20,
-      };
-
-      try {
-        // Perform API call to create/fetch user in backend
-        const createdUser = await fetch(`${BACKEND_URL}/academic/student`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(userPayload),
-        });
-
-        if (!createdUser.ok) {
-          throw new Error("Failed to create/fetch user");
-        }
-
-        // Logging the details to the console
-        const userData = await createdUser.json();
-        console.log("User ID:", user.id);
-        console.log("User Token:", token);
-        console.log("User created/fetched successfully:", userData);
-      } catch (error) {
-        console.error("Error creating/fetching user:", error);
-      }
-    }
-
-    if (isLoaded && isSignedIn) {
-      createOrFetchUser();
-    }
-  }, [isLoaded, isSignedIn]);
-
-  useEffect(() => {
-    async function fetchSessions() {
-      if (!user) return;
-
-      const token = await getToken({ template: "skillmentor-auth-frontend" });
-      if (!token) return;
-
-      try {
-      await delay(3000); // wait for 2 seconds
-        const response = await fetch(
-          `${BACKEND_URL}/academic/session/student/${user.id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch user sessions");
-        }
-
-        const data: FullSession[] = await response.json();
-        setCourses(data);
-      } catch (error) {
-        console.error("Error fetching sessions:", error);
-      }
-    }
-
-    if (isLoaded && isSignedIn) {
-      fetchSessions();
-    }
-  }, [isLoaded, isSignedIn]);
-
- if (!isLoaded || !courses.length) {
+// UI
+if (!isLoaded) {
   return (
     <div className="container py-10">
       <div className="flex items-center justify-center">
-        <Loader />   {/* custom animation */}
+        <Loader />
       </div>
     </div>
   );
 }
-  if (!isSignedIn) {
-    router("/login");
-  }
 
-  // if (!courses.length) {
-  //   return (
-  //     <div className="container py-10">
-  //       <h1 className="text-3xl font-bold tracking-tight mb-6">My Courses</h1>
-  //       <p className="text-muted-foreground">No courses enrolled yet.</p>
-  //     </div>
-  //   );
-  // }
+if (!isSignedIn) {
+  router("/login");
+  return null;
+}
 
   return (
-    <div className="container py-10">
-      <h1 className="text-3xl font-bold tracking-tight mb-6">My Courses</h1>
+  <div className="container py-10">
+    <h1 className="text-3xl font-bold tracking-tight mb-6">My Courses</h1>
+
+    {loadingCourses ? (
+      // 1) show loader while fetching
+      <div className="flex items-center justify-center py-12">
+        <Loader />
+      </div>
+    ) : courses.length === 0 ? (
+      // 2) empty state after fetch completes
+      <p className="text-muted-foreground">No courses enrolled yet.</p>
+    ) : (
+      // 3) courses grid
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {courses.map((course) => (
           <div
             key={course.session_id}
             className="rounded-2xl p-6 relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600"
           >
-            {/* Status Pill */}
             <div className="absolute top-4 right-4">
               <StatusPill status={course.session_status} />
             </div>
-
-            {/* Profile Image */}
             <div className="size-24 rounded-full bg-white/10 mb-4 relative">
               {course.mentor.mentor_image ? (
                 <img
@@ -151,12 +99,8 @@ export default function DashboardPage() {
                 </span>
               )}
             </div>
-
-            {/* Course Info */}
             <div className="space-y-1">
-              <h2 className="text-xl font-semibold text-white">
-                {course.topic}
-              </h2>
+              <h2 className="text-xl font-semibold text-white">{course.topic}</h2>
               <Link to={`/mentor/${course.mentor.mentor_id}`}>
                 <p className="text-blue-100/80">
                   <span>Mentor: </span>
@@ -165,7 +109,6 @@ export default function DashboardPage() {
                   </span>
                 </p>
               </Link>
-
               <div className="flex items-center text-blue-100/80 text-sm mt-2">
                 <CalendarDays className="mr-2 h-4 w-4" />
                 Next Session: {new Date(course.start_time).toLocaleDateString()}
@@ -174,6 +117,8 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
+
 }

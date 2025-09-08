@@ -130,8 +130,15 @@ export default function AdminDB() {
       });
       if (!res.ok) throw new Error("Failed to load sessions");
       const data = await res.json();
-      setSessions(data);
-      console.log(sessions);
+
+      // sort by start_time descending (latest first)
+      const sorted = data.sort(
+        (a: any, b: any) =>
+          new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+      );
+
+      setSessions(sorted);
+      // console.log(sessions);
     } catch (e) {
       pushToast("error", "Failed to load sessions");
     }
@@ -227,7 +234,7 @@ export default function AdminDB() {
   return (
     <div className="container mx-auto p-4 lg:p-8">
       {/* Toast container */}
-      <div className="fixed right-4 top-4 z-50 space-y-2">
+      <div className="fixed right-4 top-20 z-50 space-y-2">
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -428,22 +435,30 @@ export default function AdminDB() {
             {/* Multi-select classes */}
             <div>
               <label className="block text-sm mb-1">Assign to Classes</label>
-              <select
-                multiple
-                className="w-full rounded-lg border px-3 py-2 h-32"
-                value={selectedClassIds.map(String)}
-                onChange={(e) => {
-                  const list = Array.from(e.target.selectedOptions).map((o) => Number(o.value));
-                  setSelectedClassIds(list);
-                }}
-              >
-                {classes.map((c) => (
-                  <option key={c.class_room_id} value={c.class_room_id}>
-                    {c.title}
-                  </option>
-                ))}
-              </select>
+
+              {classes.length === 0 ? (
+                <p className="text-red-600 text-sm">
+                  No mentor unassigned classrooms found
+                </p>
+              ) : (
+                <select
+                  multiple
+                  className="w-full rounded-lg border px-3 py-2 h-32"
+                  value={selectedClassIds.map(String)}
+                  onChange={(e) => {
+                    const list = Array.from(e.target.selectedOptions).map((o) => Number(o.value));
+                    setSelectedClassIds(list);
+                  }}
+                >
+                  {classes.map((c) => (
+                    <option key={c.class_room_id} value={c.class_room_id}>
+                      {c.title}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
+
 
             <button
               className="w-full rounded-lg bg-black text-white py-2 disabled:opacity-50"
